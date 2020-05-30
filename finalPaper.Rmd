@@ -7,3 +7,52 @@ Stat/QSci 403         Final Project
 =======================================================
 Names go here
 -------------------------------------------------------
+
+Here is how I am preprocessing the data:
+
+Some things to notice:
+
+- all datapoints are from november-december 2018 in Boston (month param probably kinda useless)
+- product_id and name refer to if it is a luxury cab, a plus ... 
+- distance is between 0-4 mainly (some extremes to max of about 8)
+- almost all datapoints have surge multiplier on??
+- short_summary has 9 levels (might be good enough -> ignore long_summary)
+- precip intensity seems to have a very small range and too little cases where it isnt 0
+- precip Probability could be used in some sort of logistic prediction?
+- mainly avoided timestamps
+- icon seems to be very similar to the summaries
+- not really sure what dewPoint is but ill include it for now
+- uvIndex seems like a nice catagorical variable for us to use -> only 3 levels 
+- visibility vs visibility.1? no clue how they differ
+- I think the moon phase variable is sweet
+- not sure how temperatureMin and temperatureMax differ from temperatureHigh and temperatureLow
+- there are also apparent temperature max and lows but i left those out for now.
+
+
+The only data with NA was price with (55095). I removed these rows completely.
+
+
+``` {r pre-proc}
+dat <- read.csv("rideshare_kaggle.csv")
+dat <- dat[, c("source", "destination", "cab_type","price", "distance",
+               "temperature", "apparentTemperature", "short_summary",
+               "humidity", "windSpeed", "windGust", "visibility", 
+               "temperatureHigh", "temperatureLow", "pressure", "windBearing",
+               "cloudCover", "uvIndex", "ozone", "moonPhase")]
+
+# without non-temp data
+dat <- dat[, c("price", "temperature", "apparentTemperature", "short_summary",
+               "humidity", "windSpeed", "windGust", "visibility", 
+               "temperatureHigh", "temperatureLow", "pressure", "windBearing",
+               "cloudCover", "uvIndex", "ozone", "moonPhase")]
+
+# remove rows with NA
+dat <- dat[complete.cases(dat[,"price"]),] # remove with NA price
+```
+
+Here are some things we are planning on doing:
+- lm on all the variables (some of these are catagorical so we will need to create dummy variables)
+- forward/backward stepwise selction on the variables
+- KDE using cross val to estimate bandwidth
+- maybe consider doing some sort of regression tree (easy to interpret -> see which vars are most important)
+  - if we go down this road we could do boosting trees which use boostrap
