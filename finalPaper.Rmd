@@ -6,6 +6,7 @@ output:
 Stat/QSci 403         Final Project   
 =======================================================
 Names go here
+Cameron Sims
 -------------------------------------------------------
 
 Here is how I am preprocessing the data:
@@ -33,6 +34,7 @@ The only data with NA was price with (55095). I removed these rows completely.
 
 
 ``` {r pre-proc}
+# Data Processing
 dat <- read.csv("rideshare_kaggle.csv")
 dat <- dat[, c("source", "destination", "cab_type","price", "distance",
                "temperature", "apparentTemperature", "short_summary",
@@ -56,3 +58,33 @@ Here are some things we are planning on doing:
 - KDE using cross val to estimate bandwidth
 - maybe consider doing some sort of regression tree (easy to interpret -> see which vars are most important)
   - if we go down this road we could do boosting trees which use boostrap
+  
+```{r stepwise}
+# Create test/train sets
+train=sample(c(TRUE,FALSE), nrow(dat),rep=TRUE)
+test=(!train)
+
+# Apply regsubsets to training set
+regfit.best=regsubsets(price~.,data=dat[train,],nvmax=19)
+
+# Make model matrix from test data
+test.mat=model.matrix(price~.,data=dat[test,])
+
+# Compute test MSE for models of different sizes
+val.errors=rep(NA,19)
+for(i in 1:19){
+  coefi=coef(regfit.best,id=i)
+  pred=test.mat[,names(coefi)]%*%coefi
+  val.errors[i]=mean((dat$price[test]-pred)^2)
+}
+
+# Plot of data
+plot(seq(1,19), val.errors, main="Test MSE vs. Number of Predictors",
+     xlab="Number of Predictors", ylab="Test MSE", type='l')
+points(which.min(val.errors), min(val.errors), col='red')
+
+
+# Best model with optimal number of variables
+regfit.best=regsubsets(price~.,data=dat,nvmax=19)
+coef(regfit.best,which.min(val.errors))
+```
