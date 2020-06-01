@@ -29,27 +29,59 @@ Some things to notice:
 - not sure how temperatureMin and temperatureMax differ from temperatureHigh and temperatureLow
 - there are also apparent temperature max and lows but i left those out for now.
 
+Here are the temp data
+  - Price -> real number
+  - temperature -> real number
+  - short_summary -> catagorical (9 lvls)
+  - humidity -> real number
+  - windSpeed -> real number
+  - windGust -> real number
+  - visibility -> real number
+  - temperatureHigh -> real number
+  - temperatureLow -> real number
+  - pressure -> real number
+  - windBearing -> integer
+  - cloudCover -> real number
+  - uvIndex -> integer
+  - ozone -> real number
+  - moonPhase -> real number
+  - product_id -> factor (13 levels but only 6 usable)
 
 The only data with NA was price with (55095). I removed these rows completely.
 
 
 ``` {r pre-proc}
 # Data Processing
-dat <- read.csv("rideshare_kaggle.csv")
-dat <- dat[, c("source", "destination", "cab_type","price", "distance",
+data <- read.csv("rideshare_kaggle.csv")
+dat <- data[, c("source","product_id", "destination", "cab_type","price", "distance",
                "temperature", "apparentTemperature", "short_summary",
                "humidity", "windSpeed", "windGust", "visibility", 
                "temperatureHigh", "temperatureLow", "pressure", "windBearing",
                "cloudCover", "uvIndex", "ozone", "moonPhase")]
 
 # without non-temp data
-dat <- dat[, c("price", "temperature", "apparentTemperature", "short_summary",
+dat <- data[, c("price", "product_id", "temperature", "apparentTemperature", "short_summary",
                "humidity", "windSpeed", "windGust", "visibility", 
                "temperatureHigh", "temperatureLow", "pressure", "windBearing",
                "cloudCover", "uvIndex", "ozone", "moonPhase")]
 
 # remove rows with NA
 dat <- dat[complete.cases(dat[,"price"]),] # remove with NA price
+
+lyft <- dat[which(dat[,"product_id"] == "lyft"),]                 #51235
+lyft_line <- dat[which(dat[,"product_id"] == "lyft_line"),]       #51233
+lyft_lux <- dat[which(dat[,"product_id"] == "lyft_lux"),]         #51235
+lyft_luxsuv <- dat[which(dat[,"product_id"] == "lyft_luxsuv"),]   #51235
+lyft_plus <- dat[which(dat[,"product_id"] == "lyft_plus"),]       #51235
+lyft_premier <- dat[which(dat[,"product_id"] == "lyft_premier"),] #51235
+
+# remove product_id now that we have split
+lyft$product_id <- NULL
+lyft_line$product_id <- NULL
+lyft_lux$product_id <- NULL
+lyft_luxsuv$product_id <- NULL
+lyft_plus$product_id <- NULL
+lyft_premier$product_id <- NULL
 ```
 
 Here are some things we are planning on doing:
@@ -60,6 +92,7 @@ Here are some things we are planning on doing:
   - if we go down this road we could do boosting trees which use boostrap
   
 ```{r stepwise}
+library(leaps)
 # Create test/train sets
 train=sample(c(TRUE,FALSE), nrow(dat),rep=TRUE)
 test=(!train)
