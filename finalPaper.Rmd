@@ -327,3 +327,61 @@ x <- seq(1,32,1)
 plot(NULL, xlim= c(0,32), ylim=c(0,50), xlab="k", ylab="GCV", main="k vs modified GCV score")
 lines(x, regfit$rss[1:32]/(100*(1-(3*x+1)/100)^2))
 ```
+
+```{r permutations}
+perm_data <- data.frame(xx=character(), yy=character(), perm_result=double(),
+                        stringsAsFactors = F)
+
+# Function to perform permutation test between means
+perm_test <- function(xx, yy){
+  # Calculate means and difference
+  xx_mean <- mean(xx)
+  yy_mean <- mean(yy)
+  diff_mean <- abs(xx_mean - yy_mean)
+  
+  # Calculate lengths and combined length
+  n_x <- length(xx)
+  n_y <- length(yy)
+  n <- n_x + n_y
+  
+  # Combine data
+  data_pull <- c(xx, yy)
+  
+  # Perform permutation test
+  n_per <- 1000
+  diff_mean_per <- rep(NA, n_per)
+  for (i_per in 1:n_per){
+    w_per <- sample(n, n, replace=T)
+    data_per <- data_pull[w_per]
+    datax_new <- data_per[1:n_x]
+    datay_new <- data_per[(n_x+1):n]
+    diff_new <- abs(mean(datax_new)-mean(datay_new))
+    diff_mean_per[i_per] <- diff_new
+  }
+  
+  # Return p-value
+  return((length(which(diff_mean_per>diff_mean))+1)/n_per)
+}
+
+# Permutation Tests for means between prices depending on weather
+for (i in 1:8){
+  
+  # Get and set name for xx
+  xx <- dat[dat$short_summary==unique(dat$short_summary)[i],]
+  
+  for (j in i:8) {
+    
+    # Get and set name for yy
+    yy <- dat[dat$short_summary==unique(dat$short_summary)[j+1],]
+    
+    # Get and set permutation result
+    perm_result <- perm_test(xx$price, yy$price)
+    
+    # Add data to perm_data
+    new_df <- data.frame(xx=as.character(xx$short_summary[1]),
+                         yy=as.character(yy$short_summary[1]),
+                         perm_result=perm_result)
+    perm_data <- rbind(perm_data, new_df)
+  }
+}
+```
