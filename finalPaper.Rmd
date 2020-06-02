@@ -385,3 +385,36 @@ for (i in 1:8){
   }
 }
 ```
+
+``` {r emp-boot-thres}
+cur_data <- lyft_premier
+
+thres <- 25
+
+B <- 10000
+above.orig <- length(which(cur_data$price>thres))/nrow(cur_data)
+
+# holder of boostrap sample median
+above.BT <- rep(NA, B)
+
+for (i in 1:B) {
+  samp <- sample(nrow(cur_data), nrow(cur_data), replace=T)
+  BT <- cur_data[samp,]
+  above.BT[i] <- length(which(BT$price>thres))/nrow(BT)
+}
+
+hist(above.BT, col="tan", breaks=10,main="Histogram of % above threshold")
+abline(v=above.orig, col="red", lwd=3)
+legend("topright", legend="original sample %", col="red", lwd=3)
+
+v <- var(above.BT) # bootstrap variance of sample median
+
+mse <- mean((above.BT - above.orig)^2) # boostrap estimate of mse from sample median
+
+basic <- quantile(above.BT, c(0.05,0.95)) # quantile method
+
+v
+mse
+basic
+
+```
