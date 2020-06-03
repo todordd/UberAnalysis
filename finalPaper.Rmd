@@ -432,3 +432,35 @@ mse
 basic
 
 ```
+
+
+```{r lasso regression & prediction}
+library(tidyverse)
+library(data.table)
+df<-fread('rideshare_kaggle.csv')
+# remove NAs
+df<-na.omit(df)
+# retain the observation with  "Back Bay", 'lyft_premier' and distance distributed from 2.5 to 3
+df<-df%>%filter(source=="Back Bay" & product_id=='lyft_premier' & distance>2.5 & distance<3)
+df<-data.frame(df)
+# seprate the data into train set (70%) and test set (30%)
+train.index<-sample(1:nrow(df),0.7*nrow(df))
+train<-df[train.index,]
+test<-df[-train.index,]
+# lasso regression model
+library(glmnet)
+x<-as.matrix(train[,c('distance','temperature','surge_multiplier','humidity',
+            'windSpeed','windGust','dewPoint','cloudCover','windBearing')])
+x.test<-as.matrix(test[,c('distance','temperature','surge_multiplier','humidity',
+                           'windSpeed','windGust','dewPoint','cloudCover','windBearing')])
+y<-train$price
+y.test<-test$price
+# Cross Validation to tune the best lambda
+cv.lasso<-cv.glmnet(x=x,y=y)
+plot(cv.lasso)
+fit.lasso<-glmnet(x=x,y=y,lambda=cv.lasso$lambda.min)
+# prediction
+pred<-predict(fit.lasso,x.test)
+plot(pred,y.test)
+abline(lm(y.test~pred),col=2,lty=2)
+```
