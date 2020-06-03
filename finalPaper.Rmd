@@ -60,9 +60,10 @@ dat <- data[, c("source","product_id", "destination", "cab_type","price", "dista
                "cloudCover", "uvIndex", "ozone", "moonPhase")]
 
 # without non-temp data
-dat <- data[, c("source","distance","price", "product_id", "temperature", "apparentTemperature",                    "short_summary", "humidity", "windSpeed", "windGust", "visibility", 
-               "temperatureHigh", "temperatureLow", "pressure", "windBearing",
-               "cloudCover", "uvIndex", "ozone", "moonPhase")]
+dat <- data[, c("source","distance","price", "product_id", "temperature", "apparentTemperature", 
+                "short_summary", "humidity", "windSpeed", "windGust", "visibility",
+                "temperatureHigh", "temperatureLow", "pressure", "windBearing",
+                "cloudCover", "uvIndex", "ozone", "moonPhase")]
 
 # remove rows with NA
 dat <- dat[complete.cases(dat[,"price"]),] # remove with NA price
@@ -88,6 +89,19 @@ lyft_premier$source <- NULL
 lyft_premier <- lyft_premier[which(lyft_premier[,"distance"] <3),]
 lyft_premier <- lyft_premier[which(lyft_premier[,"distance"] >2.5),]
 lyft_premier$distance <- NULL
+# lyft_premier$price <- NULL
+
+# Code to limit hours, didn't really make a difference
+# lyft_premier <- lyft_premier[which(lyft_premier[,"hour"] == 11 | lyft_premier[,"hour"] == 12 | lyft_premier[,"hour"] == 13),]
+```
+
+```{r, fig.height=6}
+library(corrplot)
+cor_map_data <- lyft_premier
+cor_map_data$short_summary <- NULL
+
+cor_matrix <- cor(cor_map_data)
+corrplot(cor_matrix)
 ```
 
 Here are some things we are planning on doing:
@@ -398,7 +412,7 @@ above.orig <- length(which(cur_data$price>thres))/nrow(cur_data)
 above.BT <- rep(NA, B)
 
 for (i in 1:B) {
-  samp <- sample(nrow(cur_data), nrow(cur_data), replace=T)
+  samp <- sample(nrow(cur_data), nrow(cur_data), replace=F)
   BT <- cur_data[samp,]
   above.BT[i] <- length(which(BT$price>thres))/nrow(BT)
 }
