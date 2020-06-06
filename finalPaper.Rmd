@@ -8,49 +8,7 @@ Stat/QSci 403         Final Project
 Names go here
 Cameron Sims
 -------------------------------------------------------
-
-Here is how I am preprocessing the data:
-
-Some things to notice:
-
-- all datapoints are from november-december 2018 in Boston (month param probably kinda useless)
-- product_id and name refer to if it is a luxury cab, a plus ... 
-- distance is between 0-4 mainly (some extremes to max of about 8)
-- almost all datapoints have surge multiplier on??
-- short_summary has 9 levels (might be good enough -> ignore long_summary)
-- precip intensity seems to have a very small range and too little cases where it isnt 0
-- precip Probability could be used in some sort of logistic prediction?
-- mainly avoided timestamps
-- icon seems to be very similar to the summaries
-- not really sure what dewPoint is but ill include it for now
-- uvIndex seems like a nice catagorical variable for us to use -> only 3 levels 
-- visibility vs visibility.1? no clue how they differ
-- I think the moon phase variable is sweet
-- not sure how temperatureMin and temperatureMax differ from temperatureHigh and temperatureLow
-- there are also apparent temperature max and lows but i left those out for now.
-
-Here are the temp data
-  - Price -> real number
-  - temperature -> real number
-  - short_summary -> catagorical (9 lvls)
-  - humidity -> real number
-  - windSpeed -> real number
-  - windGust -> real number
-  - visibility -> real number
-  - temperatureHigh -> real number
-  - temperatureLow -> real number
-  - pressure -> real number
-  - windBearing -> integer
-  - cloudCover -> real number
-  - uvIndex -> integer
-  - ozone -> real number
-  - moonPhase -> real number
-  - product_id -> factor (13 levels but only 6 usable)
-
-The only data with NA was price with (55095). I removed these rows completely.
-
-
-``` {r pre-proc}
+``` {r pre-proc, echo=FALSE}
 # Data Processing
 data <- read.csv("rideshare_kaggle.csv")
 dat <- data[, c("source","product_id", "destination", "cab_type","price", "distance",
@@ -94,6 +52,260 @@ lyft_premier$distance <- NULL
 # Code to limit hours, didn't really make a difference
 # lyft_premier <- lyft_premier[which(lyft_premier[,"hour"] == 11 | lyft_premier[,"hour"] == 12 | lyft_premier[,"hour"] == 13),]
 ```
+
+# Introduction:
+# Methods:
+Need to talk about what we are doing
+-> data we are using
+-> weather data we are using
+# Results:
+We will now go into a discussion of the various models considered and their outcomes.
+
+## Linear Models:
+Our first attempt at modeling the relationship between various weather predictors and rideshare price was a linear model. We first fit using all the available predictors. 
+
+```{r linear-all, echo=FALSE}
+library(leaps)
+library(knitr)
+cur_data <- lyft_premier
+cur_data$short_summary <- NULL
+
+cur_data.lm <- lm(price~., data=cur_data)
+
+X = model.matrix(cur_data.lm)
+
+kable(summary(cur_data.lm)$coefficients,
+      caption = "Table of coefficients for linear model with all predictors",
+      digits = 1)
+```
+
+This model does not explain the variablity we see in price. It has an r-squared value of `r sprintf("%.3f",summary(cur_data.lm)$r.squared)`. In other words, less than 5% of the variablity we see in price is explained by our model.
+
+As we can see from Table (1), the only significant coefficient is moonPhase. However, this is likely due to the complexity of the model, as fitting price with only moonPhase lead to a non-significant coefficient. Furthermore, running stepwise selection to find the best subset of predictors also supports this conclusion.
+
+``` {r lm-all-regfit, echo=FALSE,fig.height=3, fig.cap="\\label{fig:lm-all-regfit}Plots of Mallow's Cp and RSS for various model sizes"}
+fit <- regsubsets(X, cur_data$price, intercept=FALSE, nvmax=14, method="forward")
+
+par(mfrow=c(1,2))
+x <- seq(1,length(fit$rss),1)
+plot(x, fit$rss,type = "l", xlab = "size", ylab = "RSS", main="size vs RSS")
+
+plot(x, summary(fit)$Cp, type="l", xlab="size", ylab="Cp", main="size vs Cp")
+```
+
+FromFigure \ref{fig:lm-all-regfit}, we see that RSS decreases with increased model complexity, as expected. However, we do not see the expected quadratic shape for Mallow's Cp index. Rather we see a positive linear increase, meaning that a model of size 1 (only intercept) is optimal. This means that we are best off simply taking an average of our response (price).
+
+Moving on, our next step was to limit our predictors. We decided to choose the following 5: windSpeed, ApparentTemperature, uvIndex, pressure, and humidity. Here is our reasoning for selecting these. We would expect that with high wind speeds, indviduals are less likely to walk and will therefore order more lyfts. Similarly, a high uvIndex is unhealthy and so we would expect a linear relationship. A high humidity would make walks less bearable and therefore we would expect a higher demand of rideshares. Low pressure is associated with higher likelihood of rain and under worse conditions we would expect more rides to be hailed. Lastly, at extreme apparent temperatures, we would expect individuals to be less likely to walk - a quadratic relationship between temperature and demand.
+
+``` {r interaction-plots, echo=FALSE,fig.height=4,fig.width=10, fig.cap="\\label{fig:interaction-plots}Scatterplots of every pair of predictors"}
+pairs(lyft_premier[,c("windSpeed","apparentTemperature","uvIndex","pressure","humidity")], cex.labels=1.25, bg='orange', cex=.3)
+```
+
+FromFigure \ref{fig:interaction-plots} we can see a positive correlation between WindSpeed and apparentTemperature, as well as between humidity and apparentTemperature. We also see a negative correlation between pressure and WindSpeed. To account for this within our model, we added interaction terms between these predictors. Further, to account for assumption of apparentTemperature being quadratic, we added ploynomial terms for the temperature predictor.
+
+```{r linear-small, echo=FALSE}
+library(leaps)
+library(knitr)
+cur_data <- lyft_premier
+cur_data$short_summary <- NULL
+
+cur_data.lm <- lm(price~windSpeed+poly(apparentTemperature,2)+uvIndex+pressure+humidity
+                  +windSpeed:apparentTemperature
+                  +humidity:apparentTemperature
+                  +pressure:windSpeed, data=cur_data)
+
+X = model.matrix(cur_data.lm)
+
+kable(summary(cur_data.lm)$coefficients,
+      caption = "Table of coefficients for linear model with limited predictors",
+      digits = 1)
+```
+
+We see that the increased complexity from using all the predictors did a better job of explaining the variability in price as using only a subset of the variables with interaction terms actually led to a decrease of r-squared to `r sprintf("%.3f",summary(cur_data.lm)$r.squared)`.
+
+As we can see from Table (2), there are no significant coefficients under the significance level $\alpha = 0.05$. Running stepwise selection to find the best subset of predictors gives a similar outcome to using all the predictors.
+
+``` {r lm-small-regfit, echo=FALSE,fig.height=3, fig.cap="\\label{fig:lm-small-regfit}Plots of Mallow's Cp and RSS for various model sizes"}
+fit <- regsubsets(X, cur_data$price, intercept=FALSE, nvmax=14, method="forward")
+
+par(mfrow=c(1,2))
+x <- seq(1,length(fit$rss),1)
+plot(x, fit$rss,type = "l", xlab = "size", ylab = "RSS", main="size vs RSS")
+
+plot(x, summary(fit)$Cp, type="l", xlab="size", ylab="Cp", main="size vs Cp")
+```
+
+FromFigure \ref{fig:lm-all-regfit}, we see that a model of size 1 (only intercept) is optimal. This means that we are best off simply taking an average of our response (price). 
+
+We see that through simple linear and non-linear models, we were unable to account for the variability in price for rideshares.
+
+## Threshold Analysis:
+
+Our next analysis was on the precentage of rides we see above a certian threshold. As we can see fromFigure \ref{fig:emp-boot-thres} there is a steep dropoff at $25 so our intuition is this the percentage of rides above this threshold can be an indicator of demand.
+
+``` {r emp-boot-thres,echo=FALSE,fig.height=3, fig.cap="\\label{fig:emp-boot-thres}Plot of price distribution (left) Plot of boostrap distribution (Right)"}
+par(mfrow=c(1,2))
+
+# just straight up fitting exponential using mle for lambda
+lambda.hat <- 1/mean(lyft_premier[,"price"]-15)
+
+x <-0:35
+hist(lyft_premier[,"price"]-15, col="tan", probability=T, xlab="Price - 15", main="Distribution of Price")
+lines(x,dexp(x,rate=lambda.hat), col=2)
+legend("topright", legend="mle exp", col=2, lwd=2)
+
+cur_data <- lyft_premier
+
+thres <- 25
+
+B <- 10000
+above.orig <- length(which(cur_data$price>thres))/nrow(cur_data)
+
+# holder of boostrap sample percentage
+above.BT <- rep(NA, B)
+
+for (i in 1:B) {
+  samp <- sample(nrow(cur_data), nrow(cur_data), replace=T)
+  BT <- cur_data[samp,]
+  above.BT[i] <- length(which(BT$price>thres))/nrow(BT)
+}
+
+hist(above.BT, col="tan", breaks=10,main="Hist of % above threshold", xlab="%")
+abline(v=above.orig, col="red", lwd=3)
+legend("topright", legend="original sample %", col="red", lwd=3)
+
+basic <- quantile(above.BT, c(0.05,0.95)) # quantile method
+```
+
+\ref{fig:emp-boot-thres} (Left) is a distribution of the rideshare prices we see with an exponential distribution with the maximum likelihood estimate for $\lambda$. As we can see the fit is not quite exponential.
+
+Next, we performed a bootstrap analysis of the percentage of rides we see above our threshold ($25) to estimate our true population value. From,Figure \ref{fig:emp-boot-thres} (Right) we can see that bootstrap samples had percentages approximately normally distributed around our sample value. The 90% confidence interval for the population value is :[`r sprintf("%.3f",basic[1])`, `r sprintf("%.3f",basic[2])`]. Hence, we are 90% confident that the true population percentage is between `r sprintf("%.3f",basic[1])` and `r sprintf("%.3f",basic[2])`. 
+
+## Logistic Models
+
+Following our threshold analysis, we performed logistic regression on the relationship between moonPhase and price, as well as, pressure and price. We appended a column to our data labeled **above** which took a value of 1 if the price for that specific observation was above the threshold ($25).
+
+``` {r log,echo=FALSE,fig.height=3, fig.cap="\\label{fig:log}MoonPhase logistic (left) Pressure logistic (Right)"}
+cur_data <- lyft_premier
+thres <- 25              # desired threshold for price
+
+# add indicator variable
+cur_data$above <- as.numeric(cur_data$price > thres)
+
+# fit basic logistic to data
+fit_logistic_m = glm(above ~ moonPhase, data=cur_data, 
+                   family = "binomial")
+
+aic.m <- summary(fit_logistic_m)$aic
+
+# 90% CI
+xs = data.frame(moonPhase = seq(from=0.09,to=0.93, by=.001))
+pred = predict(fit_logistic_m, type="response", newdata=xs, se=T)
+
+p.m = pred$fit
+p_U.m = pred$fit+qnorm(0.95)*pred$se.fit
+p_L.m = pred$fit-qnorm(0.95)*pred$se.fit
+
+par(mfrow=c(1,2))
+
+plot(xs$moonPhase, p.m, type="l", lwd=6, col="blue", xlab="moonPhase", ylim=c(0,1), 
+     ylab="Probability of having price above 25")
+points(cur_data$moonPhase, cur_data$above, col=2)
+lines(xs$moonPhase, p_U.m, col="dodgerblue", lwd=3,
+      lty=2)
+lines(xs$moonPhase, p_L.m, col="dodgerblue", lwd=3,
+      lty=2)
+
+# pressure fit
+fit_logistic_p = glm(above ~ pressure, data=cur_data, 
+                   family = "binomial")
+
+aic.p <- summary(fit_logistic_p)$aic
+
+# 90% CI
+xs = data.frame(pressure = seq(from=988,to=1035, by=.5))
+pred = predict(fit_logistic_p, type="response", newdata=xs, se=T)
+
+p.p = pred$fit
+p_U.p = pred$fit+qnorm(0.95)*pred$se.fit
+p_L.p = pred$fit-qnorm(0.95)*pred$se.fit
+
+plot(xs$pressure, p.p, type="l", lwd=6, col="blue", xlab="pressure",ylim=c(0,1),
+     ylab="Probability of having price above 25")
+points(cur_data$pressure, cur_data$above, col=2)
+lines(xs$pressure, p_U.p, col="dodgerblue", lwd=3,
+      lty=2)
+lines(xs$pressure, p_L.p, col="dodgerblue", lwd=3,
+      lty=2)
+```
+
+As we can see from the plots, these fits are not very successful. We see a higher probability of seeing increased variability for a higher moonPhase (closer to full moon) and for lower pressure. The AIC scores for moonPhase is `r sprintf("%.1f",aic.m)` and pressure is `r sprintf("%.1f",aic.p)`. Both are extremely high meaning we likely cannot draw any inferences from the fit. We see a similar trend regardless of what predictor we use.
+
+## Permutation test
+
+## Conclusion. 
+
+TALK ABOUT SUCCESS OF PERM TEST
+
+``` {r price,echo=FALSE,fig.height=3, fig.width=6, fig.cap="\\label{fig:price}Scatterplot of apparentTemperature and price"}
+plot(lyft_premier$apparentTemperature, lyft_premier$price, xlab="apparentTemperature", ylab="price", main="temp vs price")
+abline(h=mean(lyft_premier$price), col=2)
+legend("top", legend="mean price", col=2,lwd=1, cex=.7)
+```
+
+However, most of our attempts to fit a relationship on the data were rather insuccessful. This most likely can be attributed to our distribution of prices.Figure \ref{fig:price} is a plot of price and apparentTemperature. As we can see, price is not continious. Rather, we see horizontal bands develop. This makes us believe that Lyft's pricing algorithm is a constant multiplied by a surge parameter which is altered based on Lyft's estimation of the demand (likely intervals) and for this reason we see these horizontal lines develop. However, this could also possibly be attributed to how the data was collected. Rideshare companies do not make their pricing information public. This is to prevent price manipulation by the drivers. Because of this, the data was likely mined and perhaps the prices were estimated or rounded. Another possible explanantion is that this dataset had rides limited to about 4 miles. Perhaps if we had access to a dataset with rides of larger distances, we would see more varaition in the pricing and our models would have more success. 
+
+  While unsuccessful, these horizontal bands gave us the intuiton to do perform the threshold and logistic analysis as we see increased variability for prices above $25. For further analysis, we would like to do a similar analysis on rides of longer length. We believe that our methods would likely see more success. In addition, our paper was focused on Lyft rides. Similar analysis to what was seen in this paper should be performed on an Uber dataset to see if there are significant differences between the two companies.
+
+## Index:
+Probably wont need this
+
+## References:
+
+
+
+Here is how I am preprocessing the data:
+
+Some things to notice:
+
+- all datapoints are from november-december 2018 in Boston (month param probably kinda useless)
+- product_id and name refer to if it is a luxury cab, a plus ... 
+- distance is between 0-4 mainly (some extremes to max of about 8)
+- almost all datapoints have surge multiplier on??
+- short_summary has 9 levels (might be good enough -> ignore long_summary)
+- precip intensity seems to have a very small range and too little cases where it isnt 0
+- precip Probability could be used in some sort of logistic prediction?
+- mainly avoided timestamps
+- icon seems to be very similar to the summaries
+- not really sure what dewPoint is but ill include it for now
+- uvIndex seems like a nice catagorical variable for us to use -> only 3 levels 
+- visibility vs visibility.1? no clue how they differ
+- I think the moon phase variable is sweet
+- not sure how temperatureMin and temperatureMax differ from temperatureHigh and temperatureLow
+- there are also apparent temperature max and lows but i left those out for now.
+
+Here are the temp data
+  - Price -> real number
+  - temperature -> real number
+  - short_summary -> catagorical (9 lvls)
+  - humidity -> real number
+  - windSpeed -> real number
+  - windGust -> real number
+  - visibility -> real number
+  - temperatureHigh -> real number
+  - temperatureLow -> real number
+  - pressure -> real number
+  - windBearing -> integer
+  - cloudCover -> real number
+  - uvIndex -> integer
+  - ozone -> real number
+  - moonPhase -> real number
+  - product_id -> factor (13 levels but only 6 usable)
+
+The only data with NA was price with (55095). I removed these rows completely.
+
+
+
 
 ```{r, fig.height=6}
 library(corrplot)
@@ -140,206 +352,6 @@ points(which.min(val.errors), min(val.errors), col='red')
 # Best model with optimal number of variables
 regfit.best=regsubsets(price~.,data=dat,nvmax=19)
 coef(regfit.best,which.min(val.errors))
-```
-
-```{r testing-models}
-
-cur_data <- lyft_premier
-cur_data$short_summary <- NULL
-# pairs(lyft[,2:ncol(lyft)], cex.labels=3, pch=3, bg='orange', cex=2)
-
-#cur_data.lm <- lm(price~., data=cur_data)
-cur_data.lm <- lm(price~windSpeed+windGust+ozone+pressure + windSpeed:windGust, cur_data)
-#ozone:windSpeed:windGust+pressure:windSpeed:windGust+windSpeed:windGust + windSpeed:ozone+ windGust:ozone+ windSpeed:pressure+ windGust:pressure
-#cur_data.lm <- lm(price~ozone+pressure+ozone:pressure, cur_data)
-summary(cur_data.lm)$coefficients[2,4]
-summary(cur_data.lm)$coefficients
-X = model.matrix(cur_data.lm)[,-1]
-
-fit <- regsubsets(X, cur_data$price, intercept=FALSE, nvmax=14, method="forward")
-
-x <- seq(1,length(fit$rss),1)
-plot(x, fit$rss,type = "l", xlab = "k", ylab = "RSS", main="k vs RSS")
-
-plot(x, fit$rss/(100*(1-(3*x+1)/100)^2), type="l", xlab="k", ylab="GCV", main="k vs modified GCV score")
-```
-
-which Variables do we need interaction terms:
-``` {r interaction-terms}
-
-pairs(lyft_premier[,c("windSpeed","windGust","ozone","cloudCover","uvIndex")], cex.labels=3, pch=23, bg='orange', cex=.1)
-
-pairs(lyft_premier[,c("windSpeed","windGust","ozone","humidity","pressure")], cex.labels=1, pch=23, bg='orange', cex=.1)
-
-pairs(lyft_premier[,c("windSpeed","windGust","ozone","temperature","pressure")], cex.labels=1, pch=23, bg='orange', cex=.1)
-
-# need for sure
-plot(lyft_premier[,"windSpeed"], lyft_premier[,"windGust"])
-
-#maybe
-plot(lyft_premier[,"windSpeed"], lyft_premier[,"ozone"])
-```
-
-
-``` {r smoothing}
-pred <- lyft_premier[,"temperature"]
-output <- lyft_premier[,"price"]
-
-samp <- sample(length(pred),4*length(pred)/5)
-x.train <- pred[samp]
-y.train <- output[samp]
-x.test <- pred[-samp]
-y.test <- output[-samp]
-
-ksmooth.train <- function(x.train, y.train, kernel = c("box", "normal"), bandwidth = 0.5, CV = FALSE) {
-  X <- x.train
-  Y <- y.train
-  # sort the data
-  ind <- order(X)
-  Y <- Y[ind]
-  X <- X[ind]
-  
-  ret <- list(x.train = c(), yhat.train = c())
-  if (kernel == "box"){
-    for (i in 1:length(X)) {
-      num <- 0
-      sum <- 0
-      cur <- X[i]
-      # find every x within bandwidth
-      for (other in 1:length(X)) {
-        if (CV && (other == i)) {
-          next
-        }
-        if (abs(X[other] - cur) <= bandwidth) {
-          num <- num + 1
-          sum <- sum + Y[other]
-        }
-      }
-      ret$x.train <- c(ret$x.train, cur)
-      ret$yhat.train <- c(ret$yhat.train, sum/num)
-    }
-  } else {
-    # normal kernel smoothing
-    # find sd of normal where quartiles are +/-0.25% bandwidth
-    sd <- (bandwidth/4)/qnorm(.75,0,1)
-    for (i in 1:length(X)) {
-      num <- 0
-      den <- 0
-      cur <- X[i]
-      for (other in 1:length(X)){
-        if (CV && (other == i)) {
-          next
-        }
-        temp <- dnorm(cur-X[other], 0, sd)
-        num <- num + Y[other]*temp
-        den <- den + temp
-      }
-      ret$x.train <- c(ret$x.train, cur)
-      ret$yhat.train <- c(ret$yhat.train, num/den)
-    }
-  }
-  return(ret)
-}
-
-ksmooth.predict <- function(ksmooth.train.out, x.query) {
-  X <- ksmooth.train.out$x.train
-  Y <- ksmooth.train.out$yhat.train
-  # sort and order
-  ind <- order(X)
-  Y <- Y[ind]
-  X <- X[ind]
-  
-  y.predicted <- c()
-  for (i in 1:length(x.query)) {
-    cur <- x.query[i]
-    if (cur < X[1]) {
-      # below smallest X data
-      y.predicted <- c(y.predicted, Y[1])
-      next
-    } else if (cur > X[length(X)]) {
-      # above largest X data
-      y.predicted <- c(y.predicted, Y[length(Y)])
-      next
-    } else if (!is.na(match(cur, X))) {
-      # X contains cur return its yhat
-      y.predicted <- c(y.predicted, Y[match(cur,X)])
-      next
-    }
-    # find two closest points where cur is in between
-    ind.aft <- 1
-    while (X[ind.aft] < cur) {
-      ind.aft <- ind.aft + 1
-    }
-    # use point slope to find interpolated y
-    m <- (Y[ind.aft] - Y[ind.aft-1])/(X[ind.aft] - X[ind.aft-1])
-    y.predicted <- c(y.predicted, Y[ind.aft] + m*(cur-X[ind.aft]))
-  }
-  return(y.predicted)
-}
-
-plot(x.train, y.train, xlab="windGust", ylab="price", main="windGust vs price TRAINING data")
-Kreg = ksmooth.train(x=x.train,y=y.train, kernel = "normal",bandwidth = 2)
-lines(Kreg$x.train, Kreg$yhat.train, lwd=4, col="orange")
-
-plot(x.test, y.test, xlab="windGust", ylab="price", main="windGust vs price TEST data")
-pred <- ksmooth.predict(Kreg, x.test)
-X <- x.test
-Y <- pred
-# sort the data
-ind <- order(X)
-Y <- Y[ind]
-X <- X[ind]
-lines(X, Y,lwd=4, col = "orange")
-```
-
-``` {r parametric-normal}
-# just straight up fitting exponential using mle for mean and sd
-lambda.hat <- 1/mean(lyft_premier[,"price"]-15)
-
-x <-0:35
-hist(lyft_premier[,"price"]-15, col="tan", probability=T)
-lines(x,dexp(x,rate=lambda.hat), col=2)
-```
-
-
-
-``` {r turbo-attempt}
-# using only temperature
-truncated.power.design.matrix <- function(x) {
-  n <- length(x)
-  design.m <- matrix(NA, nrow=n, ncol = n)
-  for (i in 1:(n-1)) {
-    cur <- x[i] # so current basis is (x-cur)_+
-    for (j in 1:n) {
-      if (x[j] <= cur) {
-        design.m[j,i] <-0
-      } else {
-        design.m[j,i] <- x[j] - cur
-      }
-    }
-  }
-  design.m[,n] <- rep(1,n)
-  return(design.m)
-}
-
-X <- truncated.power.design.matrix(cur_data$temperature[1:100])
-y <- cur_data$price[1:100]
-
-regsubsets.fitted.values <- function(X, regsubsets.out, nterm) {
-  return(regsubsets(X, regsubsets.out, intercept=FALSE, nvmax=nterm, method="forward"))
-}
-
-# best subset for up to k basis functions k = [1,100]
-k <-10
-regfit <- regsubsets.fitted.values(X,y,k)
-
-x <- seq(1,k,1)
-plot(NULL, xlim= c(0,k), ylim=c(0,50), xlab = "k", ylab = "RSS", main="k vs RSS")
-lines(x, regfit$rss)
-
-x <- seq(1,32,1)
-plot(NULL, xlim= c(0,32), ylim=c(0,50), xlab="k", ylab="GCV", main="k vs modified GCV score")
-lines(x, regfit$rss[1:32]/(100*(1-(3*x+1)/100)^2))
 ```
 
 ```{r permutations}
@@ -398,39 +410,6 @@ for (i in 1:8){
     perm_data <- rbind(perm_data, new_df)
   }
 }
-```
-
-``` {r emp-boot-thres}
-cur_data <- lyft_premier
-
-thres <- 25
-
-B <- 10000
-above.orig <- length(which(cur_data$price>thres))/nrow(cur_data)
-
-# holder of boostrap sample median
-above.BT <- rep(NA, B)
-
-for (i in 1:B) {
-  samp <- sample(nrow(cur_data), nrow(cur_data), replace=F)
-  BT <- cur_data[samp,]
-  above.BT[i] <- length(which(BT$price>thres))/nrow(BT)
-}
-
-hist(above.BT, col="tan", breaks=10,main="Histogram of % above threshold")
-abline(v=above.orig, col="red", lwd=3)
-legend("topright", legend="original sample %", col="red", lwd=3)
-
-v <- var(above.BT) # bootstrap variance of sample median
-
-mse <- mean((above.BT - above.orig)^2) # boostrap estimate of mse from sample median
-
-basic <- quantile(above.BT, c(0.05,0.95)) # quantile method
-
-v
-mse
-basic
-
 ```
 
 
