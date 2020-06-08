@@ -54,6 +54,14 @@ lyft_premier$distance <- NULL
 ```
 
 # Introduction:
+In the society that develops as amazingly as ours, a more convenient way of transportation has become crucial for us. The appearance of ride-share apps like Uber and Lyft seems to solve this problem very well; however, the complicated pricing rules behind these softwares have been bothering users. Users may notice that the similar trips with same fare type can end up with huge price differences, even they were only told that the apps are mostly charge by distance. In order to better help users understand the factors that affect the price of every trip, our group decided to study the impact of environmental factors on ride-share pricing. 
+
+Our initial ideas and logic are very simple and straightforward. With worse weather conditions, people are less likely to walk or use public transportations, in this way, there is higher demand of ride-share, and the will be higher. While using the app, we can easily notice that there is always a pop-up surge multiplier notice when the weather condition is bad, or during late night or rush hours.
+
+The data set that we analyzed was based on 693071 trips from variety products of Uber and Lyft in Boston, which is a city with unstable weather conditions. There are basic Information collected form the ride-share company of each trip, such like price, distance, surge multiplier, and product type. Also, there are corresponding environmental factors - temperature, humidity, wind speed, wind gust, visibility, pressure, cloud cover, uv index, and moon phase. In order to make our analysis more reference value, we eliminate useless data and refine our research to only one type of product - Lyft Premier trips start from Back Bay with distance between 2.5 and 3 miles. 
+
+The public literatures that can be referred are very limited. We can only find one paper from Oklahoma State University analyzed the relationship between weather type and number of ride-shares in Boston. In their paper, the key finding is that transitions in weather play a crucial role in the number of rides called. With the lack of existing research about this topic, our group decided to test few models, then discuss wether those models are fit for our topic. We also wanted to discuss if some models can help us make perditions of future trip fares with particular weather conditions.
+
 # Methods:
 Need to talk about what we are doing
 -> data we are using
