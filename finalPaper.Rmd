@@ -268,9 +268,73 @@ As we can see from the plots, these fits are not very successful. We see a highe
 
 ## Permutation test
 
+Since we were having trouble finding significant predictors for price, we decided to test if the mean prices between the different weather types were significant. To do this, we performed a permutation test between the mean prices of each weather type, which included a lot of combinations. In doing so, we were able to determine which differences between weather types were significant.
+
+```{r permutations}
+perm_data <- data.frame(xx=character(), yy=character(), perm_result=double(),
+                        stringsAsFactors = F)
+
+# Function to perform permutation test between means
+perm_test <- function(xx, yy){
+  # Calculate means and difference
+  xx_mean <- mean(xx)
+  yy_mean <- mean(yy)
+  diff_mean <- abs(xx_mean - yy_mean)
+  
+  # Calculate lengths and combined length
+  n_x <- length(xx)
+  n_y <- length(yy)
+  n <- n_x + n_y
+  
+  # Combine data
+  data_pull <- c(xx, yy)
+  
+  # Perform permutation test
+  n_per <- 1000
+  diff_mean_per <- rep(NA, n_per)
+  set.seed(160) # For reproducible results
+  for (i_per in 1:n_per){
+    w_per <- sample(n, n, replace=T)
+    data_per <- data_pull[w_per]
+    datax_new <- data_per[1:n_x]
+    datay_new <- data_per[(n_x+1):n]
+    diff_new <- abs(mean(datax_new)-mean(datay_new))
+    diff_mean_per[i_per] <- diff_new
+  }
+  
+  # Return p-value
+  return((length(which(diff_mean_per>diff_mean))+1)/n_per)
+}
+
+# Permutation Tests for means between prices depending on weather
+for (i in 1:8){
+  
+  # Get and set name for xx
+  xx <- lyft_premier[lyft_premier$short_summary==unique(lyft_premier$short_summary)[i],]
+  
+  for (j in i:8) {
+    
+    # Get and set name for yy
+    yy <- lyft_premier[lyft_premier$short_summary==unique(lyft_premier$short_summary)[j+1],]
+    
+    # Get and set permutation result
+    perm_result <- perm_test(xx$price, yy$price)
+    
+    # Add data to perm_data
+    new_df <- data.frame(xx=as.character(xx$short_summary[1]),
+                         yy=as.character(yy$short_summary[1]),
+                         perm_result=perm_result)
+    perm_data <- rbind(perm_data, new_df)
+  }
+}
+
+# Reorder perm_data based on p-vals
+perm_data <- perm_data[order(perm_data$perm_result),]
+```
+
 ## Conclusion. 
 
-TALK ABOUT SUCCESS OF PERM TEST
+The permutation tests managed to reveal significant differences between mean prices for different weathers, such as "Overcast" and "Light Rain". Overall, there were 6 differences with p-values less than 10%, 2 of which were below 5%. Examining the table, it is interesting to see what weathers had significantly different mean prices and how significant these differences were. For example, "Overcast" and "Light Rain" are somewhat similar weathers, yet they had the most significant difference. These permutation tests gave us an idea on how to proceed with future analyses, as we had discovered a few pieces of useful information.
 
 ``` {r price,echo=FALSE,fig.height=3, fig.width=6, fig.cap="\\label{fig:price}Scatterplot of apparentTemperature and price"}
 plot(lyft_premier$apparentTemperature, lyft_premier$price, xlab="apparentTemperature", ylab="price", main="temp vs price")
@@ -278,7 +342,7 @@ abline(h=mean(lyft_premier$price), col=2)
 legend("top", legend="mean price", col=2,lwd=1, cex=.7)
 ```
 
-However, most of our attempts to fit a relationship on the data were rather insuccessful. This most likely can be attributed to our distribution of prices.Figure \ref{fig:price} is a plot of price and apparentTemperature. As we can see, price is not continious. Rather, we see horizontal bands develop. This makes us believe that Lyft's pricing algorithm is a constant multiplied by a surge parameter which is altered based on Lyft's estimation of the demand (likely intervals) and for this reason we see these horizontal lines develop. However, this could also possibly be attributed to how the data was collected. Rideshare companies do not make their pricing information public. This is to prevent price manipulation by the drivers. Because of this, the data was likely mined and perhaps the prices were estimated or rounded. Another possible explanantion is that this dataset had rides limited to about 4 miles. Perhaps if we had access to a dataset with rides of larger distances, we would see more varaition in the pricing and our models would have more success. 
+However, most of our attempts to fit a relationship on the data were rather unsuccessful. This most likely can be attributed to our distribution of prices.Figure \ref{fig:price} is a plot of price and apparentTemperature. As we can see, price is not continious. Rather, we see horizontal bands develop. This makes us believe that Lyft's pricing algorithm is a constant multiplied by a surge parameter which is altered based on Lyft's estimation of the demand (likely intervals) and for this reason we see these horizontal lines develop. However, this could also possibly be attributed to how the data was collected. Rideshare companies do not make their pricing information public. This is to prevent price manipulation by the drivers. Because of this, the data was likely mined and perhaps the prices were estimated or rounded. Another possible explanantion is that this dataset had rides limited to about 4 miles. Perhaps if we had access to a dataset with rides of larger distances, we would see more varaition in the pricing and our models would have more success. 
 
   While unsuccessful, these horizontal bands gave us the intuiton to do perform the threshold and logistic analysis as we see increased variability for prices above $25. For further analysis, we would like to do a similar analysis on rides of longer length. We believe that our methods would likely see more success. In addition, our paper was focused on Lyft rides. Similar analysis to what was seen in this paper should be performed on an Uber dataset to see if there are significant differences between the two companies.
 
@@ -351,21 +415,21 @@ Here are some things we are planning on doing:
 ```{r stepwise}
 library(leaps)
 # Create test/train sets
-train=sample(c(TRUE,FALSE), nrow(dat),rep=TRUE)
+train=sample(c(TRUE,FALSE), nrow(lyft_premier),rep=TRUE)
 test=(!train)
 
 # Apply regsubsets to training set
-regfit.best=regsubsets(price~.,data=dat[train,],nvmax=19)
+regfit.best=regsubsets(price~.,data=lyft_premier[train,],nvmax=19)
 
 # Make model matrix from test data
-test.mat=model.matrix(price~.,data=dat[test,])
+test.mat=model.matrix(price~.,data=lyft_premier[test,])
 
 # Compute test MSE for models of different sizes
 val.errors=rep(NA,19)
 for(i in 1:19){
   coefi=coef(regfit.best,id=i)
   pred=test.mat[,names(coefi)]%*%coefi
-  val.errors[i]=mean((dat$price[test]-pred)^2)
+  val.errors[i]=mean((lyft_premier$price[test]-pred)^2)
 }
 
 # Plot of data
@@ -375,67 +439,11 @@ points(which.min(val.errors), min(val.errors), col='red')
 
 
 # Best model with optimal number of variables
-regfit.best=regsubsets(price~.,data=dat,nvmax=19)
+regfit.best=regsubsets(price~.,data=lyft_premier,nvmax=19)
 coef(regfit.best,which.min(val.errors))
 ```
 
-```{r permutations}
-perm_data <- data.frame(xx=character(), yy=character(), perm_result=double(),
-                        stringsAsFactors = F)
 
-# Function to perform permutation test between means
-perm_test <- function(xx, yy){
-  # Calculate means and difference
-  xx_mean <- mean(xx)
-  yy_mean <- mean(yy)
-  diff_mean <- abs(xx_mean - yy_mean)
-  
-  # Calculate lengths and combined length
-  n_x <- length(xx)
-  n_y <- length(yy)
-  n <- n_x + n_y
-  
-  # Combine data
-  data_pull <- c(xx, yy)
-  
-  # Perform permutation test
-  n_per <- 1000
-  diff_mean_per <- rep(NA, n_per)
-  for (i_per in 1:n_per){
-    w_per <- sample(n, n, replace=T)
-    data_per <- data_pull[w_per]
-    datax_new <- data_per[1:n_x]
-    datay_new <- data_per[(n_x+1):n]
-    diff_new <- abs(mean(datax_new)-mean(datay_new))
-    diff_mean_per[i_per] <- diff_new
-  }
-  
-  # Return p-value
-  return((length(which(diff_mean_per>diff_mean))+1)/n_per)
-}
-
-# Permutation Tests for means between prices depending on weather
-for (i in 1:8){
-  
-  # Get and set name for xx
-  xx <- dat[dat$short_summary==unique(dat$short_summary)[i],]
-  
-  for (j in i:8) {
-    
-    # Get and set name for yy
-    yy <- dat[dat$short_summary==unique(dat$short_summary)[j+1],]
-    
-    # Get and set permutation result
-    perm_result <- perm_test(xx$price, yy$price)
-    
-    # Add data to perm_data
-    new_df <- data.frame(xx=as.character(xx$short_summary[1]),
-                         yy=as.character(yy$short_summary[1]),
-                         perm_result=perm_result)
-    perm_data <- rbind(perm_data, new_df)
-  }
-}
-```
 
 
 ```{r lasso regression & prediction}
