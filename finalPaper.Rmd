@@ -5,8 +5,10 @@ output:
 ---
 Stat/QSci 403         Final Project   
 =======================================================
-Names go here
+Todor Dimitrov
 Cameron Sims
+Jose Octavio Hermida Rojas
+Hengchen Hao
 -------------------------------------------------------
 ``` {r pre-proc, echo=FALSE}
 # Data Processing
@@ -54,35 +56,21 @@ lyft_premier$distance <- NULL
 ```
 
 # Introduction:
-In the society that develops as amazingly as ours, a more convenient way of transportation has become crucial for us. 
-The appearance of ride-share apps like Uber and Lyft seems to solve this problem very well; however, the complicated pricing 
-rules behind these softwares have been bothering users. Users may notice that the similar trips with same fare type can end up 
-with huge price differences, even they were only told that the apps are mostly charge by distance. In order to better help 
-users understand the factors that affect the price of every trip, our group decided to study the impact of environmental 
-factors on ride-share pricing. 
+In a society that develops as amazingly as ours, a more convenient way of transportation has become crucial for us. The appearance of ride-share apps like Uber and Lyft seems to solve this problem very well; however, the complicated pricing rules behind this software has been bothering users. Users may notice that the similar trips with same fare type can end up with huge price differences, even they were only told that the apps are mostly charge by distance. In order to better help users understand the factors that affect the price of every trip, our group decided to study the impact of environmental factors on ride-share pricing.
 
-Our initial ideas and logic are very simple and straightforward. With worse weather conditions, people are less likely to walk 
-or use public transportations, in this way, there is higher demand of ride-share, and the will be higher. While using the app, 
-we can easily notice that there is always a pop-up surge multiplier notice when the weather condition is bad, or during late 
-night or rush hours.
+Our initial ideas and logic are very simple and straightforward. With worse weather conditions, people are less likely to walk or use public transportations, in this way, there is higher demand of ride-share, and the price will be higher. While using the app, we can easily notice that there is always a pop-up surge multiplier notice when the weather condition is bad, or during late night or rush hours.
 
-The data set that we analyzed was based on 693071 trips from variety products of Uber and Lyft in Boston, which is a city with 
-unstable weather conditions. There are basic Information collected form the ride-share company of each trip, such like price, 
-distance, surge multiplier, and product type. Also, there are corresponding environmental factors - temperature, humidity, 
-wind speed, wind gust, visibility, pressure, cloud cover, uv index, and moon phase. In order to make our analysis more 
-reference value, we eliminate useless data and refine our research to only one type of product - Lyft Premier trips start from 
-Back Bay with distance between 2.5 and 3 miles. 
+The public literatures that can be referred are very limited. We only found one paper from Oklahoma State University that analyzed the relationship between weather type and number of ride-shares in Boston. In the paper, the key finding is that transitions in weather play a crucial role in the number of rides called. With the lack of existing research about this topic, our group decided to test few models, then discuss whether those models are fit for our topic. We also wanted to discuss if some models can help us make perditions of future trip fares with particular weather conditions.
 
-The public literatures that can be referred are very limited. We can only find one paper from Oklahoma State University 
-analyzed the relationship between weather type and number of ride-shares in Boston. In their paper, the key finding is that 
-transitions in weather play a crucial role in the number of rides called. With the lack of existing research about this topic, 
-our group decided to test few models, then discuss wether those models are fit for our topic. We also wanted to discuss if 
-some models can help us make perditions of future trip fares with particular weather conditions.
 
 # Methods:
-Need to talk about what we are doing
--> data we are using
--> weather data we are using
+To prove our hypothesis about how weather affects rideshare pricing, we explore and analyze the “Uber and Lyft Dataset Boston, MA” (reference data here) data set. This data set contained the information of 693071 trips from a variety of different products of Uber and Lyft, with all trips taking place in Boston during November through December of 2018. The data set contains basic information about each trip, such like price, distance, surge multiplier, and product type. In addition, there are each trip has a variety of environmental factors—temperature, humidity, wind speed, etc.
+
+Overall, there are 57 different variables for each trip, with 40 of the relating to weather, and the other 17 relating to details about the trip itself (distance, price, product, etc.). A lot of the predictors, however, seemed to carry less relevant weather information, like `apparentTemperatureMinTime ` and `sunriseTime`. So we opted to focus on the following set of variables to predict price changes: temperature, apparentTemperature, short_summary, humidity, windSpeed, windGust, visibility, temperatureHigh, temperatureLow, pressure, windBearing, cloudCover, uvIndex, ozone, and moonPhase.
+
+In addition to this, it was necessary that we considered other factors that could potentially affect the price of a ride or trips in which the information was incomplete. To account for this, we first eliminated any rides that did not contain all the established variables. Then we further limited our data set my focusing on Lyft Premier rides with a starting point of Black Bay that had a distance between 2.5 and 3 miles. This ensures that the variability in prices is not due to the change in product (different products have different quality and therefore different prices), distance, or geographical area in Boston. We have accounted for several factors and now end up with a data set of 433 data points which we can analyze in order to find the relationship between weather conditions and price.
+
+
 # Results:
 We will now go into a discussion of the various models considered and their outcomes.
 
@@ -394,8 +382,6 @@ Here are the temp data
 The only data with NA was price with (55095). I removed these rows completely.
 
 
-
-
 ```{r, fig.height=6}
 library(corrplot)
 cor_map_data <- lyft_premier
@@ -442,8 +428,6 @@ points(which.min(val.errors), min(val.errors), col='red')
 regfit.best=regsubsets(price~.,data=lyft_premier,nvmax=19)
 coef(regfit.best,which.min(val.errors))
 ```
-
-
 
 
 ```{r lasso regression & prediction}
