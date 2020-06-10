@@ -2,22 +2,17 @@
 output:
   pdf_document: default
   html_document: default
+title: "Environmental Influences and Rideshare Pricing"
+author:
+- Todor Dimitrov
+- Cameron Sims
+- Jose Octavio Hermida Rojas
+- Hengchen Hao
 ---
-Stat/QSci 403         Final Project   
-=======================================================
-Todor Dimitrov
-Cameron Sims
-Jose Octavio Hermida Rojas
-Hengchen Hao
--------------------------------------------------------
+
 ``` {r pre-proc, echo=FALSE}
 # Data Processing
 data <- read.csv("rideshare_kaggle.csv")
-dat <- data[, c("source","product_id", "destination", "cab_type","price", "distance",
-               "temperature", "apparentTemperature", "short_summary",
-               "humidity", "windSpeed", "windGust", "visibility", 
-               "temperatureHigh", "temperatureLow", "pressure", "windBearing",
-               "cloudCover", "uvIndex", "ozone", "moonPhase")]
 
 # without non-temp data
 dat <- data[, c("source","distance","price", "product_id", "temperature", "apparentTemperature", 
@@ -28,56 +23,40 @@ dat <- data[, c("source","distance","price", "product_id", "temperature", "appar
 # remove rows with NA
 dat <- dat[complete.cases(dat[,"price"]),] # remove with NA price
 
-lyft <- dat[which(dat[,"product_id"] == "lyft"),]                 #51235
-lyft_line <- dat[which(dat[,"product_id"] == "lyft_line"),]       #51233
-lyft_lux <- dat[which(dat[,"product_id"] == "lyft_lux"),]         #51235
-lyft_luxsuv <- dat[which(dat[,"product_id"] == "lyft_luxsuv"),]   #51235
-lyft_plus <- dat[which(dat[,"product_id"] == "lyft_plus"),]       #51235
 lyft_premier <- dat[which(dat[,"product_id"] == "lyft_premier"),] #51235
 
 # remove product_id now that we have split
-lyft$product_id <- NULL
-lyft_line$product_id <- NULL
-lyft_lux$product_id <- NULL
-lyft_luxsuv$product_id <- NULL
-lyft_plus$product_id <- NULL
 lyft_premier$product_id <- NULL
 
-##### STILL NEED TO PURGE REMAINING IF GONNA USE
 lyft_premier <- lyft_premier[which(lyft_premier[,"source"] == "Back Bay"),]
 lyft_premier$source <- NULL
 lyft_premier <- lyft_premier[which(lyft_premier[,"distance"] <3),]
 lyft_premier <- lyft_premier[which(lyft_premier[,"distance"] >2.5),]
 lyft_premier$distance <- NULL
-# lyft_premier$price <- NULL
-
-# Code to limit hours, didn't really make a difference
-# lyft_premier <- lyft_premier[which(lyft_premier[,"hour"] == 11 | lyft_premier[,"hour"] == 12 | lyft_premier[,"hour"] == 13),]
 ```
 
 # Introduction:
-In a society that develops as amazingly as ours, a more convenient way of transportation has become crucial for us. The appearance of ride-share apps like Uber and Lyft seems to solve this problem very well; however, the complicated pricing rules behind this software has been bothering users. Users may notice that the similar trips with same fare type can end up with huge price differences, even they were only told that the apps are mostly charge by distance. In order to better help users understand the factors that affect the price of every trip, our group decided to study the impact of environmental factors on ride-share pricing.
+  \hspace*{10mm}In a society that develops as amazingly as ours, a more convenient way of transportation has become crucial for us. The appearance of ride-share apps like Uber and Lyft seems to solve this problem very well; however, the complicated pricing rules behind this software has been bothering users. Users may notice that the similar trips with same fare type can end up with huge price differences, even they were only told that the apps are mostly charge by distance. In order to better help users understand the factors that affect the price of every trip, our group decided to study the impact of environmental factors on ride-share pricing.
 
-Our initial ideas and logic are very simple and straightforward. With worse weather conditions, people are less likely to walk or use public transportations, in this way, there is higher demand of ride-share, and the price will be higher. While using the app, we can easily notice that there is always a pop-up surge multiplier notice when the weather condition is bad, or during late night or rush hours.
+  \hspace*{10mm}Our initial ideas and logic are very simple and straightforward. With worse weather conditions, people are less likely to walk or use public transportations, in this way, there is higher demand of ride-share, and the price will be higher. While using the app, we can easily notice that there is always a pop-up surge multiplier notice when the weather condition is bad, or during late night or rush hours.
 
-The public literatures that can be referred are very limited. We only found one paper from Oklahoma State University that analyzed the relationship between weather type and number of ride-shares in Boston. In the paper, the key finding is that transitions in weather play a crucial role in the number of rides called. With the lack of existing research about this topic, our group decided to test few models, then discuss whether those models are fit for our topic. We also wanted to discuss if some models can help us make perditions of future trip fares with particular weather conditions.
+  \hspace*{10mm}The public literatures that can be referred are very limited. We only found one paper from Oklahoma State University that analyzed the relationship between weather type and number of ride-shares in Boston. In the paper, the key finding is that transitions in weather play a crucial role in the number of rides called (Gutha, Mamillapalli 2016). Besides this report, there have not been a great deal of scholarly reports. We are limited to interviews of rideshare executives explaining how weather dictates and influences surge pricing (Delaney 2016). With the lack of existing research about this topic, our group decided to test few models, then discuss whether those models are fit for our topic. We also wanted to discuss if some models can help us make perditions of future trip fares with particular weather conditions.
 
 
 # Methods:
-To prove our hypothesis about how weather affects rideshare pricing, we explore and analyze the “Uber and Lyft Dataset Boston, MA” (reference data here) data set. This data set contained the information of 693071 trips from a variety of different products of Uber and Lyft, with all trips taking place in Boston during November through December of 2018. The data set contains basic information about each trip, such like price, distance, surge multiplier, and product type. In addition, there are each trip has a variety of environmental factors—temperature, humidity, wind speed, etc.
+  \hspace*{10mm}To prove our hypothesis about how weather affects rideshare pricing, we explore and analyze the “Uber and Lyft Dataset Boston, MA” (BM 2019) data set. This data set contained the information of 693071 trips from a variety of different products of Uber and Lyft, with all trips taking place in Boston during November through December of 2018. The data set contains basic information about each trip, such like price, distance, surge multiplier, and product type. In addition, there are each trip has a variety of environmental factors—temperature, humidity, wind speed, etc.
 
-Overall, there are 57 different variables for each trip, with 40 of the relating to weather, and the other 17 relating to details about the trip itself (distance, price, product, etc.). A lot of the predictors, however, seemed to carry less relevant weather information, like `apparentTemperatureMinTime ` and `sunriseTime`. So we opted to focus on the following set of variables to predict price changes: temperature, apparentTemperature, short_summary, humidity, windSpeed, windGust, visibility, temperatureHigh, temperatureLow, pressure, windBearing, cloudCover, uvIndex, ozone, and moonPhase.
+  \hspace*{10mm}Overall, there are 57 different variables for each trip, with 40 of the relating to weather, and the other 17 relating to details about the trip itself (distance, price, product, etc.). A lot of the predictors, however, seemed to carry less relevant weather information, like `apparentTemperatureMinTime ` and `sunriseTime`. So we opted to focus on the following set of variables to predict price changes: temperature, apparentTemperature, short_summary, humidity, windSpeed, windGust, visibility, temperatureHigh, temperatureLow, pressure, windBearing, cloudCover, uvIndex, ozone, and moonPhase.
 
-In addition to this, it was necessary that we considered other factors that could potentially affect the price of a ride or trips in which the information was incomplete. To account for this, we first eliminated any rides that did not contain all the established variables. Then we further limited our data set my focusing on Lyft Premier rides with a starting point of Black Bay that had a distance between 2.5 and 3 miles. This ensures that the variability in prices is not due to the change in product (different products have different quality and therefore different prices), distance, or geographical area in Boston. We have accounted for several factors and now end up with a data set of 433 data points which we can analyze in order to find the relationship between weather conditions and price.
-
+  \hspace*{10mm}In addition to this, it was necessary that we considered other factors that could potentially affect the price of a ride or trips in which the information was incomplete. To account for this, we first eliminated any rides that did not contain all the established variables. Then we further limited our data set my focusing on Lyft Premier rides with a starting point of Black Bay that had a distance between 2.5 and 3 miles. This ensures that the variability in prices is not due to the change in product (different products have different quality and therefore different prices), distance, or geographical area in Boston. We have accounted for several factors and now end up with a data set of 433 data points which we can analyze in order to find the relationship between weather conditions and price.
 
 # Results:
 We will now go into a discussion of the various models considered and their outcomes.
 
 ## Linear Models:
-Our first attempt at modeling the relationship between various weather predictors and rideshare price was a linear model. We first fit using all the available predictors. 
+  \hspace*{10mm}Our first attempt at modeling the relationship between various weather predictors and rideshare price was a linear model. We first fit using all the available predictors. 
 
-```{r linear-all, echo=FALSE}
+```{r linear-all, echo=FALSE, warning=FALSE}
 library(leaps)
 library(knitr)
 cur_data <- lyft_premier
@@ -92,9 +71,9 @@ kable(summary(cur_data.lm)$coefficients,
       digits = 1)
 ```
 
-This model does not explain the variablity we see in price. It has an r-squared value of `r sprintf("%.3f",summary(cur_data.lm)$r.squared)`. In other words, less than 5% of the variablity we see in price is explained by our model.
+  \hspace*{10mm}This model does not explain the variablity we see in price. It has an r-squared value of `r sprintf("%.3f",summary(cur_data.lm)$r.squared)`. In other words, less than 5% of the variablity we see in price is explained by our model.
 
-As we can see from Table (1), the only significant coefficient is moonPhase. However, this is likely due to the complexity of the model, as fitting price with only moonPhase lead to a non-significant coefficient. Furthermore, running stepwise selection to find the best subset of predictors also supports this conclusion.
+  \hspace*{10mm}As we can see from Table (1), the only significant coefficient is moonPhase. However, this is likely due to the complexity of the model, as fitting price with only moonPhase lead to a non-significant coefficient. Furthermore, running stepwise selection to find the best subset of predictors also supports this conclusion.
 
 ``` {r lm-all-regfit, echo=FALSE,fig.height=3, fig.cap="\\label{fig:lm-all-regfit}Plots of Mallow's Cp and RSS for various model sizes"}
 fit <- regsubsets(X, cur_data$price, intercept=FALSE, nvmax=14, method="forward")
@@ -106,15 +85,15 @@ plot(x, fit$rss,type = "l", xlab = "size", ylab = "RSS", main="size vs RSS")
 plot(x, summary(fit)$Cp, type="l", xlab="size", ylab="Cp", main="size vs Cp")
 ```
 
-FromFigure \ref{fig:lm-all-regfit}, we see that RSS decreases with increased model complexity, as expected. However, we do not see the expected quadratic shape for Mallow's Cp index. Rather we see a positive linear increase, meaning that a model of size 1 (only intercept) is optimal. This means that we are best off simply taking an average of our response (price).
+  \hspace*{10mm}From Figure \ref{fig:lm-all-regfit}, we see that RSS decreases with increased model complexity, as expected. However, we do not see the expected quadratic shape for Mallow's Cp index. Rather we see a positive linear increase, meaning that a model of size 1 (only intercept) is optimal. This means that we are best off simply taking an average of our response (price).
 
-Moving on, our next step was to limit our predictors. We decided to choose the following 5: windSpeed, ApparentTemperature, uvIndex, pressure, and humidity. Here is our reasoning for selecting these. We would expect that with high wind speeds, indviduals are less likely to walk and will therefore order more lyfts. Similarly, a high uvIndex is unhealthy and so we would expect a linear relationship. A high humidity would make walks less bearable and therefore we would expect a higher demand of rideshares. Low pressure is associated with higher likelihood of rain and under worse conditions we would expect more rides to be hailed. Lastly, at extreme apparent temperatures, we would expect individuals to be less likely to walk - a quadratic relationship between temperature and demand.
+  \hspace*{10mm}Moving on, our next step was to limit our predictors. We decided to choose the following 5: windSpeed, ApparentTemperature, uvIndex, pressure, and humidity. Here is our reasoning for selecting these. We would expect that with high wind speeds, indviduals are less likely to walk and will therefore order more lyfts. Similarly, a high uvIndex is unhealthy and so we would expect a linear relationship. A high humidity would make walks less bearable and therefore we would expect a higher demand of rideshares. Low pressure is associated with higher likelihood of rain and under worse conditions we would expect more rides to be hailed. Lastly, at extreme apparent temperatures, we would expect individuals to be less likely to walk - a quadratic relationship between temperature and demand.
 
 ``` {r interaction-plots, echo=FALSE,fig.height=4,fig.width=10, fig.cap="\\label{fig:interaction-plots}Scatterplots of every pair of predictors"}
 pairs(lyft_premier[,c("windSpeed","apparentTemperature","uvIndex","pressure","humidity")], cex.labels=1.25, bg='orange', cex=.3)
 ```
 
-FromFigure \ref{fig:interaction-plots} we can see a positive correlation between WindSpeed and apparentTemperature, as well as between humidity and apparentTemperature. We also see a negative correlation between pressure and WindSpeed. To account for this within our model, we added interaction terms between these predictors. Further, to account for assumption of apparentTemperature being quadratic, we added ploynomial terms for the temperature predictor.
+  \hspace*{10mm}From Figure \ref{fig:interaction-plots} we can see a positive correlation between WindSpeed and apparentTemperature, as well as between humidity and apparentTemperature. We also see a negative correlation between pressure and WindSpeed. To account for this within our model, we added interaction terms between these predictors. Further, to account for assumption of apparentTemperature being quadratic, we added ploynomial terms for the temperature predictor.
 
 ```{r linear-small, echo=FALSE}
 library(leaps)
@@ -134,9 +113,9 @@ kable(summary(cur_data.lm)$coefficients,
       digits = 1)
 ```
 
-We see that the increased complexity from using all the predictors did a better job of explaining the variability in price as using only a subset of the variables with interaction terms actually led to a decrease of r-squared to `r sprintf("%.3f",summary(cur_data.lm)$r.squared)`.
+  \hspace*{10mm}We see that the increased complexity from using all the predictors did a better job of explaining the variability in price as using only a subset of the variables with interaction terms actually led to a decrease of r-squared to `r sprintf("%.3f",summary(cur_data.lm)$r.squared)`.
 
-As we can see from Table (2), there are no significant coefficients under the significance level $\alpha = 0.05$. Running stepwise selection to find the best subset of predictors gives a similar outcome to using all the predictors.
+  \hspace*{10mm}As we can see from Table (2), there are no significant coefficients under the significance level $\alpha = 0.05$. Running stepwise selection to find the best subset of predictors gives a similar outcome to using all the predictors.
 
 ``` {r lm-small-regfit, echo=FALSE,fig.height=3, fig.cap="\\label{fig:lm-small-regfit}Plots of Mallow's Cp and RSS for various model sizes"}
 fit <- regsubsets(X, cur_data$price, intercept=FALSE, nvmax=14, method="forward")
@@ -148,13 +127,13 @@ plot(x, fit$rss,type = "l", xlab = "size", ylab = "RSS", main="size vs RSS")
 plot(x, summary(fit)$Cp, type="l", xlab="size", ylab="Cp", main="size vs Cp")
 ```
 
-FromFigure \ref{fig:lm-all-regfit}, we see that a model of size 1 (only intercept) is optimal. This means that we are best off simply taking an average of our response (price). 
+  \hspace*{10mm}From Figure \ref{fig:lm-all-regfit}, we see that a model of size 1 (only intercept) is optimal. This means that we are best off simply taking an average of our response (price). 
 
-We see that through simple linear and non-linear models, we were unable to account for the variability in price for rideshares.
+  \hspace*{10mm}We see that through simple linear and non-linear models, we were unable to account for the variability in price for rideshares.
 
 ## Threshold Analysis:
 
-Our next analysis was on the precentage of rides we see above a certian threshold. As we can see fromFigure \ref{fig:emp-boot-thres} there is a steep dropoff at $25 so our intuition is this the percentage of rides above this threshold can be an indicator of demand.
+  \hspace*{10mm}Our next analysis was on the precentage of rides we see above a certian threshold. As we can see from Figure \ref{fig:emp-boot-thres} there is a steep dropoff at $25 so our intuition is this the percentage of rides above this threshold can be an indicator of demand.
 
 ``` {r emp-boot-thres,echo=FALSE,fig.height=3, fig.cap="\\label{fig:emp-boot-thres}Plot of price distribution (left) Plot of boostrap distribution (Right)"}
 par(mfrow=c(1,2))
@@ -185,20 +164,21 @@ for (i in 1:B) {
 
 hist(above.BT, col="tan", breaks=10,main="Hist of % above threshold", xlab="%")
 abline(v=above.orig, col="red", lwd=3)
-legend("topright", legend="original sample %", col="red", lwd=3)
+legend("topright", legend="orig %", col="red", lwd=3, cex = 0.7)
 
 basic <- quantile(above.BT, c(0.05,0.95)) # quantile method
 ```
 
-\ref{fig:emp-boot-thres} (Left) is a distribution of the rideshare prices we see with an exponential distribution with the maximum likelihood estimate for $\lambda$. As we can see the fit is not quite exponential.
+  \hspace*{10mm}Figure \ref{fig:emp-boot-thres} (Left) is a distribution of the rideshare prices we see with an exponential distribution with the maximum likelihood estimate for $\lambda$. As we can see the fit is not quite exponential.
 
-Next, we performed a bootstrap analysis of the percentage of rides we see above our threshold ($25) to estimate our true population value. From,Figure \ref{fig:emp-boot-thres} (Right) we can see that bootstrap samples had percentages approximately normally distributed around our sample value. The 90% confidence interval for the population value is :[`r sprintf("%.3f",basic[1])`, `r sprintf("%.3f",basic[2])`]. Hence, we are 90% confident that the true population percentage is between `r sprintf("%.3f",basic[1])` and `r sprintf("%.3f",basic[2])`. 
+  \hspace*{10mm}Next, we performed a bootstrap analysis of the percentage of rides we see above our threshold ($25) to estimate our true population value. From, Figure \ref{fig:emp-boot-thres} (Right) we can see that bootstrap samples had percentages approximately normally distributed around our sample value. The 90% confidence interval for the population value is: [`r sprintf("%.3f",basic[1])`, `r sprintf("%.3f",basic[2])`]. Hence, we are 90% confident that the true population percentage is between `r sprintf("%.3f",basic[1])` and `r sprintf("%.3f",basic[2])`. 
 
 ## Logistic Models
 
+  \hspace*{10mm}
 Following our threshold analysis, we performed logistic regression on the relationship between moonPhase and price, as well as, pressure and price. We appended a column to our data labeled **above** which took a value of 1 if the price for that specific observation was above the threshold ($25).
 
-``` {r log,echo=FALSE,fig.height=3, fig.cap="\\label{fig:log}MoonPhase logistic (left) Pressure logistic (Right)"}
+``` {r log,echo=FALSE,fig.height=4, fig.cap="\\label{fig:log}MoonPhase logistic (left) Pressure logistic (Right)"}
 cur_data <- lyft_premier
 thres <- 25              # desired threshold for price
 
@@ -252,13 +232,13 @@ lines(xs$pressure, p_L.p, col="dodgerblue", lwd=3,
       lty=2)
 ```
 
-As we can see from the plots, these fits are not very successful. We see a higher probability of seeing increased variability for a higher moonPhase (closer to full moon) and for lower pressure. The AIC scores for moonPhase is `r sprintf("%.1f",aic.m)` and pressure is `r sprintf("%.1f",aic.p)`. Both are extremely high meaning we likely cannot draw any inferences from the fit. We see a similar trend regardless of what predictor we use.
+  \hspace*{10mm}Figure \ref{fig:log} shows the logistic fits for both moonPhase and pressure plotted with the  as well as their respective 90% confidence intervals. As we can see from these plots, these fits are not very successful. We see a higher probability of seeing increased variability for a higher moonPhase (closer to full moon) and for lower pressure. The AIC scores for moonPhase is `r sprintf("%.1f",aic.m)` and pressure is `r sprintf("%.1f",aic.p)`. Both are extremely high meaning we likely cannot draw any inferences from the fit. We see a similar trend regardless of what predictor we use.
 
 ## Permutation test
 
-Since we were having trouble finding significant predictors for price, we decided to test if the mean prices between the different weather types were significant. To do this, we performed a permutation test between the mean prices of each weather type, which included a lot of combinations. In doing so, we were able to determine which differences between weather types were significant.
+  \hspace*{10mm}Since we were having trouble finding significant predictors for price, we decided to test if the mean prices between the different weather types were significant. To do this, we performed a permutation test between the mean prices of each weather type, which included a lot of combinations. In doing so, we were able to determine which differences between weather types were significant.
 
-```{r permutations}
+```{r permutations,echo=FALSE}
 perm_data <- data.frame(xx=character(), yy=character(), perm_result=double(),
                         stringsAsFactors = F)
 
@@ -318,145 +298,43 @@ for (i in 1:8){
 
 # Reorder perm_data based on p-vals
 perm_data <- perm_data[order(perm_data$perm_result),]
+
+colnames(perm_data) <- c("Weather type 1", "Weather type 2", "p-value")
+
+kable(perm_data[1:10,],
+      caption = "Table top 10 significant permutation tests",
+      digits = 1)
 ```
 
+  \hspace*{10mm}The permutation tests managed to reveal significant differences between mean prices for different weathers, such as "Overcast" and "Light Rain". From Table (3) we can see the top ten combinations in terms of statistical significance.  Overall, there were 6 differences with p-values less than 10%, 2 of which were below 5%. Examining Table (3), it is interesting to see what weathers had significantly different mean prices and how significant these differences were. For example, "Overcast" and "Light Rain" are somewhat similar weathers, yet they had the most significant difference. 
+
+\newpage
 ## Conclusion. 
 
-The permutation tests managed to reveal significant differences between mean prices for different weathers, such as "Overcast" and "Light Rain". Overall, there were 6 differences with p-values less than 10%, 2 of which were below 5%. Examining the table, it is interesting to see what weathers had significantly different mean prices and how significant these differences were. For example, "Overcast" and "Light Rain" are somewhat similar weathers, yet they had the most significant difference. These permutation tests gave us an idea on how to proceed with future analyses, as we had discovered a few pieces of useful information.
+  \hspace*{10mm}While a large portion of our tests and models were unsuccessful, we did see intriguing results for our permutation test. Some of these differences we would intuitively expect. It is understandable that "Clear" and "Light Rain" would have a difference in mean prices as we would expect demand to be larger for the worse weather conditon. However, interestingly enough, we did not see every combination we would expect to have significant results. For example, we did not find evidence of a difference between the means of "Clear" and "Rain". Perhaps this can be accounted for the limited number of observations we have in our dataset. These permutation tests gave us an idea on how to proceed with future analyses, and it would be interesting to do continued analysis using the divided datasets.
 
-``` {r price,echo=FALSE,fig.height=3, fig.width=6, fig.cap="\\label{fig:price}Scatterplot of apparentTemperature and price"}
+  \hspace*{10mm}However, most of our attempts to fit a relationship on the data were rather unsuccessful. This most likely can be attributed to our distribution of prices. Figure \ref{fig:price} is a plot of price and apparentTemperature. As we can see, price is not continious. Rather, we see horizontal bands develop. This makes us believe that Lyft's pricing algorithm is a constant multiplied by a surge parameter which is altered based on Lyft's estimation of the demand (likely intervals) and for this reason we see these horizontal lines develop. However, this could also possibly be attributed to how the data was collected. Rideshare companies do not make their pricing information public. This is to prevent price manipulation by the drivers. Because of this, the data was likely mined and perhaps the prices were estimated or rounded. Another possible explanantion is that this dataset had rides limited to about 4 miles. Perhaps if we had access to a dataset with rides of larger distances, we would see more varaition in the pricing and our models would have more success. 
+
+  \hspace*{10mm}While unsuccessful, these horizontal bands gave us the intuiton to do perform the threshold and logistic analysis as we see increased variability for prices above $25. For further analysis, we would like to do a similar analysis on rides of longer length. We believe that our methods would likely see more success. In addition, our paper was focused on Lyft rides. Similar analysis to what was seen in this paper should be performed on an Uber dataset to see if there are significant differences between the two companies.
+  
+``` {r price,echo=FALSE,fig.height=4, fig.width=6, fig.cap="\\label{fig:price}Scatterplot of apparentTemperature and price"}
 plot(lyft_premier$apparentTemperature, lyft_premier$price, xlab="apparentTemperature", ylab="price", main="temp vs price")
 abline(h=mean(lyft_premier$price), col=2)
 legend("top", legend="mean price", col=2,lwd=1, cex=.7)
 ```
 
-However, most of our attempts to fit a relationship on the data were rather unsuccessful. This most likely can be attributed to our distribution of prices.Figure \ref{fig:price} is a plot of price and apparentTemperature. As we can see, price is not continious. Rather, we see horizontal bands develop. This makes us believe that Lyft's pricing algorithm is a constant multiplied by a surge parameter which is altered based on Lyft's estimation of the demand (likely intervals) and for this reason we see these horizontal lines develop. However, this could also possibly be attributed to how the data was collected. Rideshare companies do not make their pricing information public. This is to prevent price manipulation by the drivers. Because of this, the data was likely mined and perhaps the prices were estimated or rounded. Another possible explanantion is that this dataset had rides limited to about 4 miles. Perhaps if we had access to a dataset with rides of larger distances, we would see more varaition in the pricing and our models would have more success. 
-
-  While unsuccessful, these horizontal bands gave us the intuiton to do perform the threshold and logistic analysis as we see increased variability for prices above $25. For further analysis, we would like to do a similar analysis on rides of longer length. We believe that our methods would likely see more success. In addition, our paper was focused on Lyft rides. Similar analysis to what was seen in this paper should be performed on an Uber dataset to see if there are significant differences between the two companies.
-
-## Index:
-Probably wont need this
-
+\newpage
 ## References:
+BM. (2019, December). Uber and Lyft Dataset Boston, MA, Version 2. Retrieved 6 May, 2020 from
 
-
-
-Here is how I am preprocessing the data:
-
-Some things to notice:
-
-- all datapoints are from november-december 2018 in Boston (month param probably kinda useless)
-- product_id and name refer to if it is a luxury cab, a plus ... 
-- distance is between 0-4 mainly (some extremes to max of about 8)
-- almost all datapoints have surge multiplier on??
-- short_summary has 9 levels (might be good enough -> ignore long_summary)
-- precip intensity seems to have a very small range and too little cases where it isnt 0
-- precip Probability could be used in some sort of logistic prediction?
-- mainly avoided timestamps
-- icon seems to be very similar to the summaries
-- not really sure what dewPoint is but ill include it for now
-- uvIndex seems like a nice catagorical variable for us to use -> only 3 levels 
-- visibility vs visibility.1? no clue how they differ
-- I think the moon phase variable is sweet
-- not sure how temperatureMin and temperatureMax differ from temperatureHigh and temperatureLow
-- there are also apparent temperature max and lows but i left those out for now.
-
-Here are the temp data
-  - Price -> real number
-  - temperature -> real number
-  - short_summary -> catagorical (9 lvls)
-  - humidity -> real number
-  - windSpeed -> real number
-  - windGust -> real number
-  - visibility -> real number
-  - temperatureHigh -> real number
-  - temperatureLow -> real number
-  - pressure -> real number
-  - windBearing -> integer
-  - cloudCover -> real number
-  - uvIndex -> integer
-  - ozone -> real number
-  - moonPhase -> real number
-  - product_id -> factor (13 levels but only 6 usable)
-
-The only data with NA was price with (55095). I removed these rows completely.
-
-
-```{r, fig.height=6}
-library(corrplot)
-cor_map_data <- lyft_premier
-cor_map_data$short_summary <- NULL
-
-cor_matrix <- cor(cor_map_data)
-corrplot(cor_matrix)
-```
-
-Here are some things we are planning on doing:
-- lm on all the variables (some of these are catagorical so we will need to create dummy variables)
-- forward/backward stepwise selction on the variables
-- KDE using cross val to estimate bandwidth
-- maybe consider doing some sort of regression tree (easy to interpret -> see which vars are most important)
-  - if we go down this road we could do boosting trees which use boostrap
+  \hspace*{10mm}https://www.kaggle.com/brllrb/uber-and-lyft-dataset-boston-ma/activity.
   
-```{r stepwise}
-library(leaps)
-# Create test/train sets
-train=sample(c(TRUE,FALSE), nrow(lyft_premier),rep=TRUE)
-test=(!train)
+Delaney, Dave. “Surge Pricing: Why a Rainy Day Ride Will Cost You More.” The Tennessean, 
 
-# Apply regsubsets to training set
-regfit.best=regsubsets(price~.,data=lyft_premier[train,],nvmax=19)
+  \hspace*{10mm}The Tennessean, 29 May 2016,
 
-# Make model matrix from test data
-test.mat=model.matrix(price~.,data=lyft_premier[test,])
+  \hspace*{10mm}www.tennessean.com/story/money/2016/05/29/surge-pricing-why-rainy-day-ride-cost-you-more/84922758/
 
-# Compute test MSE for models of different sizes
-val.errors=rep(NA,19)
-for(i in 1:19){
-  coefi=coef(regfit.best,id=i)
-  pred=test.mat[,names(coefi)]%*%coefi
-  val.errors[i]=mean((lyft_premier$price[test]-pred)^2)
-}
+Gutha, Snigdha and Anusha, Mamillapalli. “Analyzing the Effect of Weather on Uber Ridership.”
 
-# Plot of data
-plot(seq(1,19), val.errors, main="Test MSE vs. Number of Predictors",
-     xlab="Number of Predictors", ylab="Test MSE", type='l')
-points(which.min(val.errors), min(val.errors), col='red')
-
-
-# Best model with optimal number of variables
-regfit.best=regsubsets(price~.,data=lyft_premier,nvmax=19)
-coef(regfit.best,which.min(val.errors))
-```
-
-
-```{r lasso regression & prediction}
-library(tidyverse)
-library(data.table)
-df<-fread('rideshare_kaggle.csv')
-# remove NAs
-df<-na.omit(df)
-# retain the observation with  "Back Bay", 'lyft_premier' and distance distributed from 2.5 to 3
-df<-df%>%filter(source=="Back Bay" & product_id=='lyft_premier' & distance>2.5 & distance<3)
-df<-data.frame(df)
-# seprate the data into train set (70%) and test set (30%)
-train.index<-sample(1:nrow(df),0.7*nrow(df))
-train<-df[train.index,]
-test<-df[-train.index,]
-# lasso regression model
-library(glmnet)
-x<-as.matrix(train[,c('distance','temperature','surge_multiplier','humidity',
-            'windSpeed','windGust','dewPoint','cloudCover','windBearing')])
-x.test<-as.matrix(test[,c('distance','temperature','surge_multiplier','humidity',
-                           'windSpeed','windGust','dewPoint','cloudCover','windBearing')])
-y<-train$price
-y.test<-test$price
-# Cross Validation to tune the best lambda
-cv.lasso<-cv.glmnet(x=x,y=y)
-plot(cv.lasso)
-fit.lasso<-glmnet(x=x,y=y,lambda=cv.lasso$lambda.min)
-# prediction
-pred<-predict(fit.lasso,x.test)
-plot(pred,y.test)
-abline(lm(y.test~pred),col=2,lty=2)
-```
+  \hspace*{10mm}MWSUG , 2016, support.sas.com/resources/papers/proceedings17/1260-2017.pdf.
